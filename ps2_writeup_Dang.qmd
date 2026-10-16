@@ -1,0 +1,182 @@
+---
+title: "Problem Set 2"
+author: Peter Dang
+date: 10/15/2026
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+```{r}
+#| message: false
+library(tidyverse)
+library(knitr)
+```
+
+## Data
+
+This data comes from FRED (Federal Reserve Economic Data). It contains seasonally adjusted monthly unemployment rates for the United States, Oregon, California, Texas, and New York, starting in January 1976. I downloaded it with `tq_get()` and saved it as an `.rds` file so I don't have to re-download it each time.
+
+```{r}
+unemp_raw <- read_rds("data/unemp_raw.rds")
+head(unemp_raw)
+```
+
+## Wrangling
+
+I renamed `price` to `unemployment_rate`, added a `region` column, filled in the missing October 2025 value with September 2025, and calculated the month-over-month change in each region.
+
+```{r}
+unemp <- unemp_raw |>
+  rename(unemployment_rate = price) |>
+  mutate(
+    region = case_when(
+      symbol == "UNRATE" ~ "United States",
+      symbol == "ORUR" ~ "Oregon",
+      symbol == "CAUR" ~ "California",
+      symbol == "TXUR" ~ "Texas",
+      symbol == "NYUR" ~ "New York"
+    )
+  )
+
+unemp <- unemp |>
+  arrange(region, date) |>
+  group_by(region) |>
+  mutate(
+    unemployment_rate = replace(
+      unemployment_rate,
+      date == as.Date("2025-10-01"),
+      unemployment_rate[date == as.Date("2025-09-01")]
+    )
+  ) |>
+  ungroup()
+
+unemp <- unemp |>
+  arrange(region, date) |>
+  group_by(region) |>
+  mutate(unemployment_rate_change = unemployment_rate - lag(unemployment_rate)) |>
+  ungroup()
+
+unemp_recent <- unemp |>
+  filter(date >= as.Date("2015-01-01"))
+
+unemp_summary <- unemp |>
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate,  na.rm = TRUE),
+    max_rate  = max(unemployment_rate,  na.rm = TRUE)
+  )
+
+unemp_recent_summary <- unemp_recent |>
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate,  na.rm = TRUE),
+    max_rate  = max(unemployment_rate,  na.rm = TRUE)
+  )
+
+unemp_no_covid <- unemp |>
+  filter(year(date) != 2020)
+
+unemp_top_increases_no_covid <- unemp_no_covid |>
+  slice_max(unemployment_rate_change, n = 5, with_ties = TRUE)
+
+unemp_top_decreases_no_covid <- unemp_no_covid |>
+  slice_min(unemployment_rate_change, n = 5, with_ties = TRUE)
+```
+
+### Summary of unemployment rates, 1976 to present
+
+```{r}
+#| echo: false
+kable(unemp_summary, digits = 2)
+```
+
+The unemployment summary table breaks down the average, lowest, and highest unemployment rates between these four states. We can see that California has the highest average unemployment rate which exceeds the unemployment rate across the entire US.
+
+### Summary of unemployment rates, 2015 to present
+
+```{r}
+#| echo: false
+kable(unemp_recent_summary, digits = 2)
+```
+
+From 2015 to the present, California had the highest average unemployment rate (5.63%), while Texas, the United States, and Oregon were all close together, between about 4.6% and 4.8%. Every region’s minimum was a low 3.4–3.8%. The maximums are much higher, 12.8% to 16.7%, all from the spring 2020 COVID shock, with New York and California hit hardest.
+
+### Largest monthly increases (excluding 2020)
+
+```{r}
+#| echo: false
+kable(unemp_top_increases_no_covid, digits = 2)
+```
+
+### Largest monthly decreases (excluding 2020)
+
+```{r}
+#| echo: false
+kable(unemp_top_decreases_no_covid, digits = 2)
+```
+
+Once 2020 is removed, the largest one-month drops are much smaller, at most 0.7 percentage points: the U.S. in July 1983 was the biggest, during the recovery from the early-1980s recession, and most of the rest come from mid-to-late 2021, as California, New York, and the U.S. recovered from COVID.
+
+## Visualization
+
+### Unemployment rate over time
+
+```{r}
+#| echo: false
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  labs(title = "Monthly Unemployment Rate, 1976–Present",
+       x = "Date", y = "Unemployment Rate (%)", color = "Region") +
+  theme_minimal()
+```
+
+In 2008 (Great Recession) and 2020 (Covid) there were the largest unemployment rate spikes.
+
+### Unemployment rate by region
+
+```{r}
+#| echo: false
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line(show.legend = FALSE) +
+  facet_wrap(~ region) +
+  labs(title = "Monthly Unemployment Rate by Region, 1976–Present",
+       x = "Date", y = "Unemployment Rate (%)") +
+  theme_minimal()
+```
+
+We can see that the unemployment rates in each state and US as a whole follows a common trend.
+
+### Average unemployment rate by region
+
+```{r}
+#| echo: false
+ggplot(unemp_summary, aes(x = fct_reorder(region, mean_rate), y = mean_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(title = "Average Unemployment Rate by Region, 1976–Present",
+       x = "Region", y = "Mean Unemployment Rate (%)") +
+  theme_minimal()
+```
+
+Within these four states, Texas does not exceed the average unemployment rate in the United States.
+
+### Distribution of unemployment rates by region
+
+```{r}
+#| echo: false
+ggplot(unemp, aes(x = fct_reorder(region, unemployment_rate, .fun = median),
+                  y = unemployment_rate, fill = region)) +
+  geom_boxplot(show.legend = FALSE) +
+  labs(title = "Distribution of Monthly Unemployment Rates by Region, 1976–Present",
+       x = "Region", y = "Unemployment Rate (%)") +
+  theme_minimal()
+```
+
+I made a box plot to compare the full distribution of unemployment rates across regions, not just the averages. It shows which states have higher typical unemployment and which have more variable labor markets.
+
+## Reflection
+
+This assignment made me much more comfortable using dplyr to clean and transform data, especially chaining arrange(), group_by(), and mutate() together with the pipe to fill in the missing October 2025 value and compute month-over-month changes. I learned why the order of these steps matters: lag() only gives the right change when the data are sorted by date and grouped by region first. Presenting my work in Quarto turned out to be much harder than writing the code itself, since everything has to run cleanly from top to bottom, and small mistakes like a misplaced + in a ggplot call would stop the whole document from rendering. Even so, the visualizations were my favorite part, because seeing the recession spikes and the 2020 COVID shock across all five regions made the numbers in my tables much easier to understand. I now feel more confident structuring an analysis as a reproducible document that someone else could pick up and follow.
