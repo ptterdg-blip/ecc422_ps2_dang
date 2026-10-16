@@ -48,6 +48,39 @@ unemp <- unemp |>
 unemp_recent <- unemp |>
   filter(date >= as.Date("2015-01-01"))
 
-# Full sample summary by region
+# Full-sample summary by region
 unemp_summary <- unemp |>
-  group_by(region) |> 
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate,  na.rm = TRUE),
+    max_rate  = max(unemployment_rate,  na.rm = TRUE)
+  )
+
+# Same summary for the recent sample
+unemp_recent_summary <- unemp_recent |>
+  group_by(region) |>
+  summarize(
+    mean_rate = mean(unemployment_rate, na.rm = TRUE),
+    min_rate  = min(unemployment_rate,  na.rm = TRUE),
+    max_rate  = max(unemployment_rate,  na.rm = TRUE)
+  )
+
+unemp_top_increases <- unemp |> 
+  slice_max(unemployment_rate_change, n = 5, with_ties = TRUE)
+
+unemp_top_decreases <- unemp |> 
+  slice_min(unemployment_rate_change, n = 5, with_ties = TRUE)
+    
+unemp_no_covid <- unemp |> 
+  filter(year(date) != 2020)
+
+unemp_top_increases_no_covid <- unemp_no_covid |> 
+  slice_max(unemployment_rate_change, n = 5, with_ties = TRUE)
+
+unemp_top_decreases_no_covid <- unemp_no_covid |>
+  slice_min(unemployment_rate_change, n = 5, with_ties = TRUE)
+
+
+
+    
