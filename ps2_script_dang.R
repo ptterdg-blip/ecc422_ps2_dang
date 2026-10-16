@@ -81,6 +81,41 @@ unemp_top_increases_no_covid <- unemp_no_covid |>
 unemp_top_decreases_no_covid <- unemp_no_covid |>
   slice_min(unemployment_rate_change, n = 5, with_ties = TRUE)
 
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() + 
+  labs(title = "Monthly Unemployment rate, 1976 - Present",
+       x = "Date",
+       y = "Unemployment Rate (%)")
++ theme_minimum()
 
+ggplot(unemp, aes(x = date, y = unemployment_rate, color = region)) +
+  geom_line() +
+  facet_wrap(~ region) +
+  labs(
+    title = "Monthly Unemployment Rate by Region, 1976 - Present",
+    x = "Date",
+    y = "Unemployment Rate (%):"
+  ) +
+  theme_minimal()
 
-    
+ggplot(unemp_summary, aes(x = fct_reorder(region, mean_rate), y = mean_rate)) +
+  geom_col(fill = "steelblue") +
+  labs(
+    title = "Average Unemployment Rate by Region, 1976–Present",
+    x = "Region",
+    y = "Mean Unemployment Rate (%)"
+  ) +
+  theme_minimal()
+
+ggplot(unemp, aes(x = fct_reorder(region, unemployment_rate, .fun = median),
+                  y = unemployment_rate,
+                  fill = region)) +
+  geom_boxplot(show.legend = FALSE) +
+  labs(
+    title = "Distribution of Monthly Unemployment Rates by Region, 1976–Present",
+    x = "Region",
+    y = "Unemployment Rate (%)"
+  ) +
+  theme_minimal()
+# I made a box plot to compare the full distribution of unemployment rates across regions, not just the 
+# averages in 5.3. It shows which states have higher typical unemployment and which have more variable labor markets.
